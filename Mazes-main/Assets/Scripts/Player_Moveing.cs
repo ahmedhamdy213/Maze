@@ -1,19 +1,27 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class Player_Moveing : MonoBehaviour
 {
     public Animator animator;
     public SpriteRenderer spriteRenderer;
+    public AudioSource failsound;
     public float speed = 5.0f;
-    private bool isAttachedToRope = false;
-    private HingeJoint2D ropeJoint;
+    public Slider staminaSlider;
+    public float maxStamina = 100f;
+    public float staminaDecreaseRate = 5f;
+    public float staminaIncreaseRate = 10f;
+
+    private float currentStamina;
 
     void Start()
     {
-        ropeJoint = gameObject.AddComponent<HingeJoint2D>();
-        ropeJoint.enabled = false;
+        currentStamina = maxStamina;
+        staminaSlider.maxValue = maxStamina;
+        staminaSlider.value = currentStamina;
     }
 
     void FixedUpdate()
@@ -33,24 +41,44 @@ public class Player_Moveing : MonoBehaviour
         Vector3 vertical = new Vector3(0.0f, verticalInput, 0.0f);
         transform.position += vertical * speed * Time.deltaTime;
 
-        if (Input.GetKeyDown(KeyCode.Space) && isAttachedToRope)
+        // Stamina logic
+        if (horizontalInput != 0 || verticalInput != 0)
         {
-            // Detach from rope
-            isAttachedToRope = false;
-            ropeJoint.enabled = false;
+            DecreaseStamina(staminaDecreaseRate * Time.deltaTime);
+        }
+        else
+        {
+            IncreaseStamina(staminaIncreaseRate * Time.deltaTime);
         }
     }
 
-    void OnCollisionEnter2D(Collision2D collision)
+    void DecreaseStamina(float amount)
     {
-        if (collision.gameObject.CompareTag("Rope"))
+        currentStamina -= amount;
+        staminaSlider.value = currentStamina;
+
+        if (currentStamina <= 0)
         {
-            // Attach to rope
-            isAttachedToRope = true;
-            ropeJoint.enabled = true;
-            ropeJoint.connectedBody = collision.rigidbody;
-            ropeJoint.anchor = Vector2.zero;
-            ropeJoint.connectedAnchor = collision.transform.InverseTransformPoint(transform.position);
+            failsound.Play();
+            StartCoroutine(RestartLevelAfterDelay(1.5f));
         }
+    }
+    IEnumerator RestartLevelAfterDelay(float delay)
+    {
+        speed = 0f; 
+        GetComponent<Collider2D>().enabled = false;
+        yield return new WaitForSeconds(delay); // Wait for the specified delay
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); // Restart the level
+    }
+
+    void IncreaseStamina(float amount)
+    {
+        currentStamina = Mathf.Min(currentStamina + amount, maxStamina);
+        staminaSlider.value = currentStamina;
+    }
+
+    public void AddStamina(float amount)
+    {
+        IncreaseStamina(amount);
     }
 }
